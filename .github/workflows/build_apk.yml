@@ -1,0 +1,43 @@
+name: Build Riqah APK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install Cordova
+      run: npm install -g cordova
+
+    - name: Prepare Cordova project
+      run: |
+        mkdir cordova_app
+        cd cordova_app
+        cordova create rqa_app com.rqa.app Riqah
+        cd rqa_app
+        rm -rf www
+        cp -r ../../www ./www
+        cordova platform add android
+
+    - name: Build APK
+      run: |
+        cd cordova_app/rqa_app
+        cordova build android --release
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Riqah-APK
+        path: cordova_app/rqa_app/platforms/android/app/build/outputs/apk/release/app-release.apk
