@@ -1,0 +1,50 @@
+name: Build Riqah APK (Full www support)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60   # زيادة الوقت للتعامل مع الملفات الكبيرة
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Install Capacitor CLI
+      run: npm install -g @capacitor/cli
+
+    - name: Prepare Capacitor project
+      run: |
+        mkdir capacitor_app
+        cd capacitor_app
+        npx cap init Riqah com.rqa.app
+        # إزالة www الافتراضي
+        rm -rf www
+        # نسخ كامل مجلد www من المستودع مع الملفات الكبيرة
+        cp -r ../../www ./www
+        npx cap add android
+
+    - name: Sync Android platform
+      run: |
+        cd capacitor_app
+        npx cap sync android
+
+    - name: Build APK
+      run: |
+        cd capacitor_app/android
+        ./gradlew assembleRelease --stacktrace --info
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Riqah-APK
+        path: capacitor_app/android/app/build/outputs/apk/release/app-release.apk
