@@ -1,45 +1,61 @@
-name: Build Cordova APK
+name: Build APK
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  build:
+  build-android-apk:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+
     steps:
-    - name: 📥 Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: 🔧 Install Java + Node + Cordova
-      run: |
-        sudo apt update
-        sudo apt install -y openjdk-17-jdk
-        sudo npm install -g cordova
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
 
-    - name: 📦 Install project dependencies
-      run: |
-        npm install || true
+      - name: Install Cordova
+        run: npm install -g cordova
 
-    - name: 🏗 Add Android platform
-      run: |
-        cordova platform add android
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    - name: ⚙ Build APK (Release)
-      run: |
-        cordova build android --release
+      - name: Download Android SDK (command-line tools)
+        run: |
+          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          cd $ANDROID_SDK_ROOT/cmdline-tools
+          curl -o sdk-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip sdk-tools.zip
+          rm sdk-tools.zip
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/tools/bin/sdkmanager --licenses
+          $ANDROID_SDK_ROOT/cmdline-tools/tools/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
 
-    - name: 📤 Upload APK artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: zazo-apk
-        path: platforms/android/app/build/outputs/apk/**/*.apk
+      - name: Create Cordova project
+        run: |
+          rm -rf zazo_app
+          cordova create zazo_app com.zazo.app Zazo
+          cd zazo_app
+          cordova platform add android
+          cp -r ../www/* www/
 
-    - name: 🚀 Publish APK to Release (optional)
-      uses: softprops/action-gh-release@v1
-      with:
-        files: platforms/android/app/build/outputs/apk/**/*.apk
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build APK
+        run: |
+          cd zazo_app
+          cordova build android --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zazo-apk
+          path: zazo_app/platforms/android/app/build/outputs/apk/release/*.apk
