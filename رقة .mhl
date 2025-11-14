@@ -1,0 +1,72 @@
+name: Build Zazo APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-android-apk:
+    runs-on: ubuntu-latest
+
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      PATH: ${{ github.workspace }}/android-sdk/cmdline-tools/bin:${{ github.workspace }}/android-sdk/platform-tools:${{ runner.temp }}/npm-global/bin:${{ env.PATH }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install Cordova safely
+        run: |
+          npm config set prefix $RUNNER_TEMP/npm-global
+          npm install -g cordova
+          echo "::add-path::$RUNNER_TEMP/npm-global/bin"
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download and setup Android SDK
+        run: |
+          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          cd $ANDROID_SDK_ROOT/cmdline-tools
+          curl -o sdk-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip sdk-tools.zip
+          rm sdk-tools.zip
+          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/tools/bin:$PATH
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+
+      - name: Verify tools
+        run: |
+          cordova -v
+          java -version
+          sdkmanager --list
+
+      - name: Create Cordova project
+        run: |
+          rm -rf zazo_app
+          cordova create zazo_app com.zazo.app Zazo
+          cd zazo_app
+          cordova platform add android
+          cp -r ../www/* www/
+
+      - name: Build APK (Release)
+        run: |
+          cd zazo_app
+          cordova build android --release || { echo "⚠️ Build failed"; exit 1; }
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zazo-apk
+          path: zazo_app/platforms/android/app/build/outputs/apk/release/*.apk
