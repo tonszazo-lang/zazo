@@ -1,0 +1,45 @@
+name: Build Cordova APK
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v3
+
+    - name: 🔧 Install Java + Node + Cordova
+      run: |
+        sudo apt update
+        sudo apt install -y openjdk-17-jdk
+        sudo npm install -g cordova
+
+    - name: 📦 Install project dependencies
+      run: |
+        npm install || true
+
+    - name: 🏗 Add Android platform
+      run: |
+        cordova platform add android
+
+    - name: ⚙ Build APK (Release)
+      run: |
+        cordova build android --release
+
+    - name: 📤 Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: zazo-apk
+        path: platforms/android/app/build/outputs/apk/**/*.apk
+
+    - name: 🚀 Publish APK to Release (optional)
+      uses: softprops/action-gh-release@v1
+      with:
+        files: platforms/android/app/build/outputs/apk/**/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
